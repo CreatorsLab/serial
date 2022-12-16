@@ -17,7 +17,8 @@ import (
 	//"unsafe"
 )
 
-func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
+// TODO Implement write timeout
+func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration, writeTimeout time.Duration) (p *Port, err error) {
 	f, err := os.OpenFile(name, syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_NONBLOCK, 0666)
 	if err != nil {
 		return

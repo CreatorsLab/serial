@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package serial
@@ -37,7 +38,7 @@ type structTimeouts struct {
 	WriteTotalTimeoutConstant   uint32
 }
 
-func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
+func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration, writeTimeout time.Duration) (p *Port, err error) {
 	if len(name) > 0 && name[0] != '\\' {
 		name = "\\\\.\\" + name
 	}
@@ -65,7 +66,7 @@ func openPort(name string, baud int, databits byte, parity Parity, stopbits Stop
 	if err = setupComm(h, 64, 64); err != nil {
 		return nil, err
 	}
-	if err = setCommTimeouts(h, readTimeout); err != nil {
+	if err = setCommTimeouts(h, readTimeout, writeTimeout); err != nil {
 		return nil, err
 	}
 	if err = setCommMask(h); err != nil {
@@ -215,7 +216,7 @@ func setCommState(h syscall.Handle, baud int, databits byte, parity Parity, stop
 	return nil
 }
 
-func setCommTimeouts(h syscall.Handle, readTimeout time.Duration) error {
+func setCommTimeouts(h syscall.Handle, readTimeout, writeTimeout time.Duration) error {
 	var timeouts structTimeouts
 	const MAXDWORD = 1<<32 - 1
 
@@ -230,6 +231,13 @@ func setCommTimeouts(h syscall.Handle, readTimeout time.Duration) error {
 		} else if timeoutMs > MAXDWORD-1 {
 			timeoutMs = MAXDWORD - 1
 		}
+	}
+
+	// blocking write by default
+	var writeTimeoutMs int64 = 0
+
+	if writeTimeout > 0 {
+		writeTimeoutMs = writeTimeout.Nanoseconds() / 1e6
 	}
 
 	/* From http://msdn.microsoft.com/en-us/library/aa363190(v=VS.85).aspx
@@ -252,11 +260,17 @@ func setCommTimeouts(h syscall.Handle, readTimeout time.Duration) error {
 
 		 If no bytes arrive within the time specified by
 		       ReadTotalTimeoutConstant, ReadFile times out.
+
+		 A value of zero for both the WriteTotalTimeoutMultiplier and
+		 WriteTotalTimeoutConstant members indicates that total time-out
+		 are not used for write operations.
 	*/
 
 	timeouts.ReadIntervalTimeout = MAXDWORD
 	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD
 	timeouts.ReadTotalTimeoutConstant = uint32(timeoutMs)
+	timeouts.WriteTotalTimeoutMultiplier = 0
+	timeouts.WriteTotalTimeoutConstant = uint32(writeTimeoutMs)
 
 	r, _, err := syscall.Syscall(nSetCommTimeouts, 2, uintptr(h), uintptr(unsafe.Pointer(&timeouts)), 0)
 	if r == 0 {

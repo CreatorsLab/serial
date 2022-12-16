@@ -11,7 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
+// TODO Implement write timeout
+func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration, writeTimeout time.Duration) (p *Port, err error) {
 	var bauds = map[int]uint32{
 		50:      unix.B50,
 		75:      unix.B75,
